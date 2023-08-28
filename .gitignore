@@ -55,3 +55,6 @@ program
 *.bmp
 compile_commands.json
 *.*~
+*.png
+*.txt
+*.py

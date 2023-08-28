@@ -118,7 +118,6 @@ int main(int argc, char **argv)
         const char *map = mmap(0, size, PROT_READ, MAP_SHARED, handle_fd, fb->offsets[handle_index]);
 
         log_info("Mapped memory successfully\n");
-        log_info("pixel_format=%d, offset=%u, pitch=%u\n", fb->pixel_format, fb->offsets[handle_index], fb->pitches[handle_index]);
 
         if (fb->pixel_format != DRM_FORMAT_XRGB8888) {
             log_error("Unsupported pixel format\n");
@@ -131,38 +130,6 @@ int main(int argc, char **argv)
         img = (unsigned char *)malloc(img_size);
         memset(img, 0, img_size);
 
-        uint32_t x_min = 100;
-        uint32_t x_max = 200;
-        uint32_t y_min = 100;
-        uint32_t y_max = 200;
-        for (int y = 0; y < fb->height; y++) {
-            for (int x = 0; x < fb->width; x++) {
-                if (y < y_max
-                    && y > y_min
-                    && x < x_max
-                    && x > x_min)
-                {
-                    uint32_t offset = y * (3 * fb->width) + (3 * x);
-                    img[offset++] = 0;
-                    img[offset++] = 0;
-                    img[offset++] = 255;
-                }
-
-                if (y < y_max * 3
-                    && y > y_min * 3
-                    && x < x_max * 3
-                    && x > x_min * 3)
-                {
-                    uint32_t offset = y * (3 * fb->width) + (3 * x);
-                    img[offset++] = 0;
-                    img[offset++] = 255;
-                    img[offset++] = 0;
-                }
-            }
-        }
-            
-
-        FILE* f = fopen("data.txt", "w");
         uint32_t offset = 0;
         for (uint32_t y = 0; y < fb->height; y++) {
             uint32_t read_in_row = 0;
@@ -170,23 +137,17 @@ int main(int argc, char **argv)
                 // Read 32 bits because DRM_FORMAT_XRGB8888
                 unsigned char pixels[4];
                 memcpy(&pixels[0], &map[offset], sizeof(unsigned char) * 4);
-                //printf("%d, %d, %d\n", pixels[0], pixels[1], pixels[2]);
                 uint32_t pixel_position = (fb->height - 1 - y) * (3 * fb->width) + (3 * x);
                 img[pixel_position++] = pixels[0];
                 img[pixel_position++] = pixels[1];
                 img[pixel_position++] = pixels[2];
                 read_in_row += sizeof(unsigned char) * 4;
                 offset += sizeof(unsigned char) * 4;
-                fprintf(f, "%d, %d, %d\n", pixels[0], pixels[1], pixels[2]);
             }
-
-            fprintf(f, "\n");
-
+            
             if (read_in_row != fb->pitches[handle_index])
                 log_error("Read the wrong pitch: %d\n", read_in_row);
         }
-
-        fclose(f);
 
         if (offset != size)
             log_error("Failed to read the entire size!\n");
@@ -194,51 +155,6 @@ int main(int argc, char **argv)
         generateBitmapImage(img, fb->height, fb->width, (char*)"output.bmp");
         free(img);
         // TODO: Unmap
-
-        bool new_way = true;
-        if (new_way) continue;
-
-        struct gbm_import_fd_data data = {handle_fd, fb->width, fb->height,
-                                          fb->offsets[handle_index], fb->pixel_format};
-        struct gbm_bo *bo = gbm_bo_import(device, GBM_BO_IMPORT_FD, &data, 0);
-
-        if (!bo) {
-            log_error("Could not import a buffer object for the file descriptor");
-            continue;
-        }
-
-        uint32_t stride;
-        void *map_data = NULL;
-        void *addr = gbm_bo_map(bo, 0, 0, fb->width, fb->height, 0, &stride, &map_data);
-        if (addr == MAP_FAILED) {
-            log_error("Could not map the buffer object");
-            continue;
-        }
-
-        if (map_data == NULL) {
-            log_error("Mapped data was null");
-            continue;
-        }
-
-        if (stride <= 0) {
-            log_error("Stride is less than zero");
-            continue;
-        }
-
-        uint32_t *pixel = (uint32_t *)addr;
-        uint32_t pixel_size = sizeof(*pixel);
-        log_info("Beginning map over region: height=%d, width=%d\n", fb->height, fb->width);
-        log_info("stride=%d, pixel_size=%d", stride, pixel_size);
-        for (uint32_t y = 0; y < fb->height; y++) {
-            //log_info("[ ");
-            for (uint32_t x = 0; x < fb->width; x++) {
-                uint32_t index = y * (stride / pixel_size) + x;
-                //log_info("%d, ", pixel[index]);
-            }
-            //log_info(" ]\n");
-        }
-
-        gbm_bo_unmap(bo, map_data);
     }
 
     return 0;
