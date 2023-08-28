@@ -119,30 +119,47 @@ int main(int argc, char **argv)
         log_info("Mapped memory successfully\n");
         log_info("pixel_format=%d, offset=%u, pitch=%u\n", fb->pixel_format, fb->offsets[handle_index], fb->pitches[handle_index]);
 
+        if (fb->pixel_format != DRM_FORMAT_XRGB8888) {
+            log_error("Unsupported pixel format\n");
+            exit(1);
+        }
+
         // Image array
         unsigned char *img = NULL;
-        int filesize = 3 * fb->width * fb->height;
         img = (unsigned char *)malloc(3 * fb->width * fb->height);
         memset(img, 0, 3 * fb->width * fb->height);
         uint32_t img_index = 0;
-        
+
+        uint32_t offset = 0;
         for (uint32_t y = 0; y < fb->height; y++) {
-            uint32_t offset = y * fb->pitches[handle_index];
             for (uint32_t x = 0; x < fb->width; x++) {
                 // Read 32 bits because DRM_FORMAT_XRGB8888
-                offset += 24 * x;
-                printf("%d / %d\n", offset, size);
-                char* ptr = &map[offset];
-                uint8_t b = ptr[0];
-                uint8_t g = ptr[4];
-                uint8_t r = ptr[8];
+                uint8_t pixels[3];
+                memcpy(&pixels[0], &map[offset], sizeof(uint8_t) * 3);
+                img[img_index++] = pixels[0];
+                img[img_index++] = pixels[1];
+                img[img_index++] = pixels[2];
+                offset += 4;
+                continue;
+                
+                uint8_t b = map[offset];
+                offset += 1;
+                uint8_t g = map[offset];
+                offset += 1;
+                uint8_t r = map[offset];
+                offset += 1;
+
+                /* b = ((float)x) / ((float) fb->width) * 255.f; */
+                /* g = ((float)y) / ((float) fb->height) * 255.f; */
+                /* r = 255.f - ((float)x) / ((float) fb->width) * 255.f; */
+                
                 img[img_index] = b;
                 img_index++;
                 img[img_index] = g;
                 img_index++;
                 img[img_index] = r;
                 img_index++;
-                //printf("%d, %d, %d\n", r, g, b);
+                printf("%d, %d, %d\n", r, g, b);
             }
         }
 
