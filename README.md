@@ -1,2 +1,3 @@
-# drm_screen_shot
-DRM-based Screenshot Utility
+# Grabber
+
+- Run as root
