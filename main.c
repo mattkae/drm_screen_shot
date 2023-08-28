@@ -88,12 +88,6 @@ int main(int argc, char **argv)
         }
 
         log_info("File Descriptor for the handle is: %d\n", handle_fd);
-        struct gbm_device *device = gbm_create_device(drm_fd);
-
-        if (!device) {
-            log_error("Could not find a GBM device for the file descriptor");
-            continue;
-        }
 
         // Establish a memory map.
         size_t size = fb->height * fb->pitches[handle_index];

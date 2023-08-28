@@ -1,12 +1,12 @@
 CXX=gcc
-CXXFLAGS=-g -Wall -pedantic `pkg-config --cflags libdrm` `pkg-config --cflags glib-2.0` `pkg-config --cflags gbm` `pkg-config --cflags libjpeg`
+CXXFLAGS=-g -Wall -pedantic `pkg-config --cflags libdrm`
 src = $(wildcard *.c)
 obj = $(src:.c=.o)
 OUTPUT_PATH=.
 
-LDFLAGS=`pkg-config --libs libdrm` `pkg-config --libs glib-2.0` `pkg-config --libs gbm` `pkg-config --libs libjpeg`
+LDFLAGS=`pkg-config --libs libdrm`
 
-program: $(obj)
+drm_screen_shot: $(obj)
 	$(CXX) $(obj) -o "$(OUTPUT_PATH)/$@" $(LDFLAGS)
 
 %.o: %.c
@@ -15,4 +15,4 @@ program: $(obj)
 .PHONY: clean
 
 clean:
-	rm -f $(obj) program
+	rm -f $(obj) drm_screen_shot

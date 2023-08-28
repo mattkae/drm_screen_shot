@@ -51,7 +51,7 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
-program
+drm_screen_shot
 *.bmp
 compile_commands.json
 *.*~
