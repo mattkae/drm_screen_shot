@@ -14,6 +14,7 @@
 #include <drm/drm_fourcc.h>
 #include <jpeglib.h>
 #include "bitmap.h"
+#include <string.h>
 
 #define log_info(...) printf(__VA_ARGS__)
 #define log_error(...) fprintf(stderr, __VA_ARGS__)
@@ -114,7 +115,7 @@ int main(int argc, char **argv)
         }
 
         size_t size = fb->height * fb->pitches[handle_index];
-        char *map = mmap(0, size, PROT_READ, MAP_SHARED, handle_fd, fb->offsets[handle_index]);
+        const char *map = mmap(0, size, PROT_READ, MAP_SHARED, handle_fd, fb->offsets[handle_index]);
 
         log_info("Mapped memory successfully\n");
         log_info("pixel_format=%d, offset=%u, pitch=%u\n", fb->pixel_format, fb->offsets[handle_index], fb->pitches[handle_index]);
@@ -129,26 +130,66 @@ int main(int argc, char **argv)
         int img_size = 3 * fb->width * fb->height;
         img = (unsigned char *)malloc(img_size);
         memset(img, 0, img_size);
-        uint32_t img_index = 0;
 
+        uint32_t x_min = 100;
+        uint32_t x_max = 200;
+        uint32_t y_min = 100;
+        uint32_t y_max = 200;
+        for (int y = 0; y < fb->height; y++) {
+            for (int x = 0; x < fb->width; x++) {
+                if (y < y_max
+                    && y > y_min
+                    && x < x_max
+                    && x > x_min)
+                {
+                    uint32_t offset = y * (3 * fb->width) + (3 * x);
+                    img[offset++] = 0;
+                    img[offset++] = 0;
+                    img[offset++] = 255;
+                }
+
+                if (y < y_max * 3
+                    && y > y_min * 3
+                    && x < x_max * 3
+                    && x > x_min * 3)
+                {
+                    uint32_t offset = y * (3 * fb->width) + (3 * x);
+                    img[offset++] = 0;
+                    img[offset++] = 255;
+                    img[offset++] = 0;
+                }
+            }
+        }
+            
+
+        FILE* f = fopen("data.txt", "w");
         uint32_t offset = 0;
         for (uint32_t y = 0; y < fb->height; y++) {
             uint32_t read_in_row = 0;
             for (uint32_t x = 0; x < fb->width; x++) {
                 // Read 32 bits because DRM_FORMAT_XRGB8888
-                uint8_t pixels[4];
-                memcpy(&pixels[0], &map[offset], sizeof(uint8_t) * 4);
+                unsigned char pixels[4];
+                memcpy(&pixels[0], &map[offset], sizeof(unsigned char) * 4);
                 //printf("%d, %d, %d\n", pixels[0], pixels[1], pixels[2]);
-                img[img_index++] = pixels[0];
-                img[img_index++] = pixels[1];
-                img[img_index++] = pixels[2];
-                read_in_row += sizeof(uint8_t) * 4;
-                offset += sizeof(uint8_t) * 4;
+                uint32_t pixel_position = (fb->height - 1 - y) * (3 * fb->width) + (3 * x);
+                img[pixel_position++] = pixels[0];
+                img[pixel_position++] = pixels[1];
+                img[pixel_position++] = pixels[2];
+                read_in_row += sizeof(unsigned char) * 4;
+                offset += sizeof(unsigned char) * 4;
+                fprintf(f, "%d, %d, %d\n", pixels[0], pixels[1], pixels[2]);
             }
+
+            fprintf(f, "\n");
 
             if (read_in_row != fb->pitches[handle_index])
                 log_error("Read the wrong pitch: %d\n", read_in_row);
         }
+
+        fclose(f);
+
+        if (offset != size)
+            log_error("Failed to read the entire size!\n");
 
         generateBitmapImage(img, fb->height, fb->width, (char*)"output.bmp");
         free(img);
