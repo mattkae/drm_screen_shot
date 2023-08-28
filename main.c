@@ -1,9 +1,5 @@
-/* gcc -o drawinbuffer drawinbuffer.cA $(pkg-config --cflags --libs glib-2.0
- * libdrm) */
-
 #include <fcntl.h>
 #include <gbm.h>
-#include <glib.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,7 +8,6 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 #include <drm/drm_fourcc.h>
-#include <jpeglib.h>
 #include "bitmap.h"
 #include <string.h>
 
@@ -23,7 +18,6 @@ int main(int argc, char **argv)
 {
     log_info("Reading the contents of the screen...\n");
     
-    int drm_fd;
     drmModeRes *resources = NULL;
     drmModeConnector *connector = NULL;
     drmModeEncoder *encoder = NULL;
@@ -31,7 +25,7 @@ int main(int argc, char **argv)
     struct _drmModeFB2 *fb;
     uint32_t buffer_id = 0;
 
-    drm_fd = open("/dev/dri/card0", O_RDWR);
+    int drm_fd = open("/dev/dri/card0", O_RDWR);
     if (drm_fd < 0) {
         log_error("Unable to open DRI device\n");
         exit(1);
@@ -69,7 +63,8 @@ int main(int argc, char **argv)
     fb = drmModeGetFB2(drm_fd, buffer_id);
 
     log_info("Got the framebuffer, id=%d, width=%d, height=%d\n", fb->fb_id, fb->width, fb->height);
-    
+
+    /* Check if we have any handles available to us. */
     int handle_index_check;
     for (handle_index_check = 0; handle_index_check < 4; handle_index_check++)
     {
@@ -83,24 +78,10 @@ int main(int argc, char **argv)
     }
             
 
-    int err;
+    /* Output the first image that we find. */
     for (int handle_index = 0; handle_index < 4 && fb->handles[handle_index]; handle_index++) {
-        bool dup = false;
-
-        for (int other_handle_index = 0; other_handle_index < handle_index; other_handle_index++) {
-            if (fb->handles[handle_index] == fb->handles[other_handle_index]) {
-                dup = true;
-                break;
-            }
-        }
-
-        if (dup) {
-            // Duplicate...
-            continue;
-        }
-
         int handle_fd;
-        err = drmPrimeHandleToFD(drm_fd, fb->handles[handle_index], 0, &handle_fd);
+        int err = drmPrimeHandleToFD(drm_fd, fb->handles[handle_index], 0, &handle_fd);
         if (err < 0) {
             log_error("Could not get prime handle from file descriptor\n");
             continue;
@@ -114,6 +95,7 @@ int main(int argc, char **argv)
             continue;
         }
 
+        // Establish a memory map.
         size_t size = fb->height * fb->pitches[handle_index];
         const char *map = mmap(0, size, PROT_READ, MAP_SHARED, handle_fd, fb->offsets[handle_index]);
 
@@ -124,12 +106,13 @@ int main(int argc, char **argv)
             exit(1);
         }
 
-        // Image array
+        // Initialize the array of pixels
         unsigned char *img = NULL;
         int img_size = 3 * fb->width * fb->height;
         img = (unsigned char *)malloc(img_size);
         memset(img, 0, img_size);
 
+        // Iterate over the framebuffer and add the pixels to the array.
         uint32_t offset = 0;
         for (uint32_t y = 0; y < fb->height; y++) {
             uint32_t read_in_row = 0;
@@ -154,7 +137,7 @@ int main(int argc, char **argv)
 
         generateBitmapImage(img, fb->height, fb->width, (char*)"output.bmp");
         free(img);
-        // TODO: Unmap
+        munmap(img, img_size);
     }
 
     return 0;
