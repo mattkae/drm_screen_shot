@@ -126,41 +126,28 @@ int main(int argc, char **argv)
 
         // Image array
         unsigned char *img = NULL;
-        img = (unsigned char *)malloc(3 * fb->width * fb->height);
-        memset(img, 0, 3 * fb->width * fb->height);
+        int img_size = 3 * fb->width * fb->height;
+        img = (unsigned char *)malloc(img_size);
+        memset(img, 0, img_size);
         uint32_t img_index = 0;
 
         uint32_t offset = 0;
         for (uint32_t y = 0; y < fb->height; y++) {
+            uint32_t read_in_row = 0;
             for (uint32_t x = 0; x < fb->width; x++) {
                 // Read 32 bits because DRM_FORMAT_XRGB8888
-                uint8_t pixels[3];
-                memcpy(&pixels[0], &map[offset], sizeof(uint8_t) * 3);
+                uint8_t pixels[4];
+                memcpy(&pixels[0], &map[offset], sizeof(uint8_t) * 4);
+                //printf("%d, %d, %d\n", pixels[0], pixels[1], pixels[2]);
                 img[img_index++] = pixels[0];
                 img[img_index++] = pixels[1];
                 img[img_index++] = pixels[2];
-                offset += 4;
-                continue;
-                
-                uint8_t b = map[offset];
-                offset += 1;
-                uint8_t g = map[offset];
-                offset += 1;
-                uint8_t r = map[offset];
-                offset += 1;
-
-                /* b = ((float)x) / ((float) fb->width) * 255.f; */
-                /* g = ((float)y) / ((float) fb->height) * 255.f; */
-                /* r = 255.f - ((float)x) / ((float) fb->width) * 255.f; */
-                
-                img[img_index] = b;
-                img_index++;
-                img[img_index] = g;
-                img_index++;
-                img[img_index] = r;
-                img_index++;
-                printf("%d, %d, %d\n", r, g, b);
+                read_in_row += sizeof(uint8_t) * 4;
+                offset += sizeof(uint8_t) * 4;
             }
+
+            if (read_in_row != fb->pitches[handle_index])
+                log_error("Read the wrong pitch: %d\n", read_in_row);
         }
 
         generateBitmapImage(img, fb->height, fb->width, (char*)"output.bmp");
